@@ -24,9 +24,7 @@ from ros2cli.helpers import before_invocation
 from ros2cli.helpers import bind
 from ros2cli.helpers import get_ros_domain_id
 from ros2cli.helpers import pretty_print_call
-
 from ros2cli.node.network_aware import NetworkAwareNode
-
 from ros2cli.xmlrpc.local_server import LocalXMLRPCServer
 from ros2cli.xmlrpc.local_server import SimpleXMLRPCRequestHandler
 
@@ -77,7 +75,64 @@ def serve(server: LocalXMLRPCServer, *, timeout: int = 2 * 60 * 60):
         node_name_suffix=f'_daemon_{ros_domain_id}_{uuid.uuid4().hex}',
         start_parameter_services=False,
         start_type_description_service=False)
+
+    # Get server address early for closure
+    server_url = get_xmlrpc_server_url(server.server_address)
+
     with NetworkAwareNode(node_args) as node:
+        def get_daemon_info():
+            """Get daemon process information."""
+            return {
+                'xmlrpc_url': server_url,
+                'ros_domain_id': ros_domain_id,
+            }
+
+        def get_network_interfaces():
+            """Get network interface information from the daemon's NetworkAwareNode."""
+            # Use the addresses that the NetworkAwareNode is tracking
+            # This is the same data that is displayed in --debug mode
+            addresses_by_interfaces = node.addresses_at_start
+            # Convert to serializable format for XML-RPC
+            result = {}
+            for iface_name, addrs in addresses_by_interfaces.items():
+                result[iface_name] = []
+                for addr in addrs:
+                    addr_info = {
+                        'family': int(addr.family),
+                        'address': addr.address,
+                        'netmask': addr.netmask,
+                        'broadcast': addr.broadcast,
+                    }
+                    result[iface_name].append(addr_info)
+            return result
+
+        def get_cache_info():
+            """Get cached ROS graph information."""
+            # Get all cached information from the daemon node
+            nodes = node.get_node_names_and_namespaces()
+            topics = node.get_topic_names_and_types()
+            services = node.get_service_names_and_types()
+            actions = rclpy.action.get_action_names_and_types(node)
+
+            return {
+                'nodes': {
+                    'count': len(nodes),
+                    'list': [f"{name} ({ns})" for name, ns in nodes]
+                },
+                'topics': {
+                    'count': len(topics),
+                    'list': [name for name, _ in topics]
+                },
+                'services': {
+                    'count': len(services),
+                    'list': [name for name, _ in services]
+                },
+                'actions': {
+                    'count': len(actions),
+                    'list': [name for name, _ in actions]
+                }
+            }
+
         functions = [
             node.get_name,
             node.get_namespace,
@@ -124,6 +179,12 @@ def serve(server: LocalXMLRPCServer, *, timeout: int = 2 * 60 * 60):
             server.register_function(
                 before_invocation(
                     func, reset_timer_and_pretty_print))
+
+        # Register status information functions
+        server.register_function(get_daemon_info, 'get_daemon_info')
+        server.register_function(
+            get_network_interfaces, 'get_network_interfaces')
+        server.register_function(get_cache_info, 'get_cache_info')
 
         shutdown = False
 
