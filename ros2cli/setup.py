@@ -54,6 +54,7 @@ commands and verbs.""",
             'ros2cli.daemon.verb = ros2cli.verb.daemon:VerbExtension',
         ],
         'ros2cli.daemon.verb': [
+            'list = ros2cli.verb.daemon.list:ListVerb',
             'start = ros2cli.verb.daemon.start:StartVerb',
             'status = ros2cli.verb.daemon.status:StatusVerb',
             'stop = ros2cli.verb.daemon.stop:StopVerb',
