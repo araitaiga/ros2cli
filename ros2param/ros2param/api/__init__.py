@@ -104,13 +104,13 @@ def call_set_parameters(*, node, node_name, parameters):
     return response
 
 
-def call_list_parameters(*, node, node_name, prefixes=None):
+def call_list_parameters(*, node, node_name, prefixes=None, timeout_sec=5.0):
     client = AsyncParameterClient(node, node_name)
     ready = client.wait_for_services(timeout_sec=5.0)
     if not ready:
         return None
     future = client.list_parameters(prefixes=prefixes)
-    rclpy.spin_until_future_complete(node, future)
+    rclpy.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
     return future
 
 
@@ -136,7 +136,7 @@ class ParameterNameCompleter:
     def __call__(self, prefix, parsed_args, **kwargs):
         with DirectNode(parsed_args) as node:
             parameter_names = call_list_parameters(
-                node=node, node_name=parsed_args.node_name)
+                node=node, node_name=parsed_args.node_name, prefixes=None, timeout_sec=5.0)
             return [
                 n for n in parameter_names
                 if not prefix or n.startswith(prefix)]

@@ -46,6 +46,9 @@ from ros2cli.node.strategy import NodeStrategy
 TEST_NODE = 'test_node'
 TEST_NAMESPACE = '/foo'
 
+HANG_NODE = 'param_list_hang_node'
+HANG_NAMESPACE = '/'
+
 TEST_TIMEOUT = 20.0
 
 # Skip cli tests on Windows while they exhibit pathological behavior
@@ -72,6 +75,15 @@ def generate_test_description(rmw_implementation):
         arguments=[str(path_to_parameter_node_script)],
     )
 
+    # Hang node test fixture (does not respond to list_parameters)
+    path_to_hang_node_script = path_to_fixtures / 'param_list_hang_node.py'
+    hang_node = Node(
+        executable=sys.executable,
+        name=HANG_NODE,
+        namespace=HANG_NAMESPACE,
+        arguments=[str(path_to_hang_node_script)],
+    )
+
     return LaunchDescription([
         # TODO(jacobperron): Provide a common RestartCliDaemon launch action in ros2cli
         ExecuteProcess(
@@ -96,6 +108,7 @@ def generate_test_description(rmw_implementation):
                     name='daemon-start',
                     on_exit=[
                         parameter_node,
+                        hang_node,
                         launch_testing.actions.ReadyToTest(),
                     ],
                 )
@@ -205,6 +218,16 @@ class TestVerbList(unittest.TestCase):
             text=param_list_command.output,
             strict=False
         )
+
+    def test_verb_list_timeout(self):
+        with self.launch_param_list_command(
+            arguments=[f'{HANG_NAMESPACE}{HANG_NODE}', '--timeout', '2']
+        ) as param_list_command:
+            assert param_list_command.wait_for_shutdown(timeout=TEST_TIMEOUT)
+        assert param_list_command.exit_code == launch_testing.asserts.EXIT_OK
+        assert 'Wait for service timed out waiting for' in param_list_command.output
+        assert 'list_parameters service response from node' in param_list_command.output
+        assert HANG_NODE in param_list_command.output
 
     @launch_testing.markers.retry_on_failure(times=5, delay=1)
     def test_verb_list_filter(self):
