@@ -51,10 +51,10 @@ class ListVerb(VerbExtension):
             '--param-type', action='store_true',
             help='Print parameter types with parameter names')
         parser.add_argument(
-            '--timeout', metavar='N', type=float, default=5.0,
+            '--per-node-timeout', metavar='N', type=float, default=5.0,
             help=(
                 'Maximum wait time per node for list_parameters service call '
-                'in seconds (default: 5.0)'))
+                'in seconds (default: %(default)s)'))
 
     def main(self, *, args):  # noqa: D102
         with NodeStrategy(args) as node:
@@ -73,16 +73,15 @@ class ListVerb(VerbExtension):
             regex_filter = re.compile(regex_filter[0])
 
         with DirectNode(args) as node:
-            responses = {}
+            # Sort node_names alphabetically
+            node_names = sorted(node_names, key=lambda n: n.full_name)
             for node_name in node_names:
-                responses[node_name] = call_list_parameters(
+                response = call_list_parameters(
                     node=node,
                     node_name=node_name.full_name,
                     prefixes=args.param_prefixes,
-                    timeout_sec=args.timeout)
-            # print responses
-            for node_name in sorted(responses.keys()):
-                response = responses[node_name]
+                    timeout_sec=args.per_node_timeout)
+                # print response
                 if response is None:
                     print(
                         'Wait for service timed out waiting for '
