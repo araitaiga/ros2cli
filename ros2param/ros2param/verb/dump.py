@@ -68,21 +68,11 @@ class DumpVerb(VerbExtension):
             yaml_output = {node_name.full_name: {'ros__parameters': {}}}
 
             # retrieve parameter names
-            response = call_list_parameters(
-                node=node,
-                node_name=absolute_node_name,
-                timeout_sec=args.timeout)
-
+            response = call_list_parameters(node=node, node_name=absolute_node_name)
             if response is None:
                 print(
                     'Wait for service timed out waiting for '
                     f'parameter services for node {node_name.full_name}', file=sys.stderr)
-                return
-            elif not response.done():
-                # Future did not complete within timeout
-                print(
-                    'Wait for service timed out waiting for '
-                    f'list_parameters service response from node {node_name.full_name}')
                 return
             elif response.result() is None:
                 e = response.exception()

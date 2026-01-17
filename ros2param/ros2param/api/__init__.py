@@ -104,7 +104,7 @@ def call_set_parameters(*, node, node_name, parameters):
     return response
 
 
-def call_list_parameters(*, node, node_name, prefixes=None, timeout_sec=5.0):
+def call_list_parameters(*, node, node_name, prefixes=None, timeout_sec=None):
     client = AsyncParameterClient(node, node_name)
     ready = client.wait_for_services(timeout_sec=5.0)
     if not ready:
