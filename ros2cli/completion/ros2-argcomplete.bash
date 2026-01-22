@@ -17,3 +17,10 @@ if type register-python-argcomplete3 > /dev/null 2>&1; then
 elif type register-python-argcomplete > /dev/null 2>&1; then
   eval "$(register-python-argcomplete ros2)"
 fi
+
+# Add -o nosort to preserve the completion order set by argcomplete
+# (options first, then other completions like file names)
+# This requires bash 4.4 or later
+if [[ "${BASH_VERSINFO[0]}" -ge 5 ]] || [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 ]]; then
+  complete -o nosort -o nospace -o default -o bashdefault -F _python_argcomplete ros2
+fi

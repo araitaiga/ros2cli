@@ -18,10 +18,44 @@ import builtins
 import functools
 import signal
 import sys
+from typing import List
 
 from rclpy.executors import ExternalShutdownException
 
 from ros2cli.command import add_subparsers_on_demand
+
+
+class OptionsFirstCompletionFinder:
+    """
+    Custom CompletionFinder that sorts completion results with options first.
+
+    This wrapper class sorts completions so that options (starting with '-')
+    appear before other completions (like file names, package names, etc.).
+    """
+
+    def __init__(self, finder_class):
+        self.finder_class = finder_class
+
+    def __call__(self, argument_parser, **kwargs):
+        # Create the original finder
+        finder = self.finder_class()
+        # Override filter_completions to sort options first
+        original_filter = finder.filter_completions
+
+        def filter_completions_sorted(completions: List[str]) -> List[str]:
+            filtered = original_filter(completions)
+            # Separate options (starting with '-') from other completions
+            options = [c for c in filtered if c.startswith('-')]
+            others = [c for c in filtered if not c.startswith('-')]
+            # Sort options by their name without leading dashes, so that
+            # -d and --debug appear together (both sort by 'd' and 'debug')
+            # For options with same base name, shorter one comes first (-d before --debug)
+            options_sorted = sorted(options, key=lambda x: (x.lstrip('-'), len(x)))
+            return options_sorted + sorted(others)
+
+        finder.filter_completions = filter_completions_sorted
+        # Call the finder with the original arguments
+        return finder(argument_parser, **kwargs)
 
 
 def main(*, script_name='ros2', argv=None, description=None, extension=None):
@@ -57,11 +91,13 @@ def main(*, script_name='ros2', argv=None, description=None, extension=None):
 
     # register argcomplete hook if available
     try:
-        from argcomplete import autocomplete
+        from argcomplete import CompletionFinder
     except ImportError:
         pass
     else:
-        autocomplete(parser, exclude=['-h', '--help'])
+        # Use custom CompletionFinder that sorts options first
+        options_first_autocomplete = OptionsFirstCompletionFinder(CompletionFinder)
+        options_first_autocomplete(parser, exclude=['-h', '--help'])
 
     # parse the command line arguments
     args = parser.parse_args(args=argv)
